@@ -103,50 +103,70 @@ workflow OMICSGENETRAITASSOCIATION {
     //
     // MODULE: PASCAL
     //
-    PASCAL_SUBWORKFLOW (
-        ch_input.pascal,
-        params.pascal_gene_annotation,
-        params.pascal_ref_panel
-    )
-    ch_pascal_output = PASCAL_SUBWORKFLOW.out.pascal_output
-    ch_pascal_cma_format = PASCAL_SUBWORKFLOW.out.cma_format_output
-    ch_versions = ch_versions.mix(PASCAL_SUBWORKFLOW.out.versions)
+    if (!params.skip_pascal) {
+        PASCAL_SUBWORKFLOW (
+            ch_input.pascal,
+            params.pascal_gene_annotation,
+            params.pascal_ref_panel
+        )
+        ch_pascal_output = PASCAL_SUBWORKFLOW.out.pascal_output
+        ch_pascal_cma_format = PASCAL_SUBWORKFLOW.out.cma_format_output
+        ch_versions = ch_versions.mix(PASCAL_SUBWORKFLOW.out.versions)
+    }
 
-    // ch_pascal_output.view()
 
     //
     // SUBWORKFLOW: MMAP_SUBWORKFLOW
     //
-    MMAP_SUBWORKFLOW (
-        params.mmap_gene_list,
-        params.trait,
-        ch_input.twas,
-        params.mmap_pedigree_file,
-        params.mmap_cov_matrix_file
-    )
-    ch_mmap_parsed = MMAP_SUBWORKFLOW.out.parsed_mmap_output
-    ch_mmap_cma_format = MMAP_SUBWORKFLOW.out.cma_format_output
-    ch_versions = ch_versions.mix(MMAP_SUBWORKFLOW.out.versions)
+    if (!params.skip_mmap) {
+        MMAP_SUBWORKFLOW (
+            params.mmap_gene_list,
+            params.trait,
+            ch_input.twas,
+            params.mmap_pedigree_file,
+            params.mmap_cov_matrix_file
+        )
+        ch_mmap_parsed = MMAP_SUBWORKFLOW.out.parsed_mmap_output
+        ch_mmap_cma_format = MMAP_SUBWORKFLOW.out.cma_format_output
+        ch_versions = ch_versions.mix(MMAP_SUBWORKFLOW.out.versions)
+    }
 
     //
     // MODULE: run CMA
     //
+    // TODO: scalable way to combine cma formatted input data (when there are multiple additional sources)
+    // TODO: scalable way to combine cma formatted input data when skipping upstream processes
+    if (!params.skip_CMA) {
+        if (!params.skip_pascal && !params.skip_mmap) {
+            ch_cma_input_files = ch_pascal_cma_format
+                .mix(ch_mmap_cma_format)
+                .toList()
+        }
 
-    // ch_pascal_cma_format.view()
-    // ch_mmap_cma_format.view()
+        if (params.skip_pascal) {
+            ch_cma_input_files = ch_mmap_cma_format
+                .toList()
+        }
+        if (params.skip_mmap) {
+            ch_cma_input_files = ch_pascal_cma_format
+                .toList()
+        }
+    }
 
-    ch_cma_input_files = ch_pascal_cma_format
-        .mix(ch_mmap_cma_format)
-        .toList()
+    if (!params.skip_CMA) {
+        CMA_SUBWORKFLOW (
+            ch_cma_input_files,
+            params.trait,
+            []
+        )
+        ch_pval = CMA_SUBWORKFLOW.out.pval
+            .collect()
+        ch_versions = ch_versions.mix(CMA_SUBWORKFLOW.out.versions)
+    }
 
-    CMA_SUBWORKFLOW (
-        ch_cma_input_files,
-        params.trait,
-        []
-    )
-    ch_pval = CMA_SUBWORKFLOW.out.pval
-        .collect()
-    ch_versions = ch_versions.mix(CMA_SUBWORKFLOW.out.versions)
+    if (params.skip_CMA && !params.skip_pascal) {
+        ch_pval = ch_pascal_cma_format
+    }
 
     //
     // MODULE: PREPROCESSFORPASCAL
