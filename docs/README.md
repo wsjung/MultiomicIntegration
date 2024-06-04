@@ -6,5 +6,7 @@ The nf-core/omicsgenetraitassociation documentation is split into the following 
     -   An overview of how the pipeline works, how to run it and a description of all of the different command-line flags.
 -   [Output](output.md)
     -   An overview of the different results produced by the pipeline and how to interpret them.
+-   [Containers](containers.md)
+    -   An overview of modules that currently use personally hosted containers and where to locate the respective Dockerfiles.  
 
 You can find a lot more documentation about installing, configuring and running nf-core pipelines on the website: [https://nf-co.re](https://nf-co.re)
